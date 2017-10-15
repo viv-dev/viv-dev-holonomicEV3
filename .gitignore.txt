@@ -12,6 +12,7 @@ local.properties
 
 # External tool builders
 .externalToolBuilders/
+
 # JAVA
 # Compiled class file
 *.class

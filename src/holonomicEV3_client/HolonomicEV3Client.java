@@ -219,7 +219,7 @@ public class HolonomicEV3Client extends JFrame
 		//This needs to be configured per controller type...
 		double x = inputs.get("X Axis") * MAX_VALUE;
 		double y = inputs.get("Y Axis") * MAX_VALUE;
-		double spinning = (-inputs.get("X Rotation")) * MAX_VALUE * MAX_SPIN;
+		double spinning = -(inputs.get("X Rotation") * MAX_VALUE * MAX_SPIN);
 		double speed = Math.sqrt(x * x + y * y) * MAX_SPEED;
 		
 		double theta = Math.atan2(y, x); // direction

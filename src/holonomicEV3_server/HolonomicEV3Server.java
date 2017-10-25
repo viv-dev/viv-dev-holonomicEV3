@@ -12,7 +12,7 @@ import lejos.robotics.SampleProvider;
 import lejos.hardware.ev3.LocalEV3;
 
 @SuppressWarnings("deprecation")
-public class HolonomicEV3Server extends Thread
+public class HolonomicEV3Server
 {
 	public static final int CLOSE = 0;
 	public static final int JOYSTICK = 1;
@@ -29,30 +29,30 @@ public class HolonomicEV3Server extends Thread
 	
 	private Socket client;
 	private static boolean running = true;
-	private static ServerSocket server;
+	private ServerSocket server;
 
 	private OmniPilot pilot;
 	static Power battery = LocalEV3.get().getPower();
 	InputStream in;
 	
-	//private boolean absolute = false;
-	
 	public static void main(String[] args) throws IOException
 	{
-		server = new ServerSocket(PORT);
-		while (running)
-		{
-			System.out.println("Awaiting client..");
-			new HolonomicEV3Server(server.accept()).start();
-		}
+		new HolonomicEV3Server();
 	}
 	
-	public HolonomicEV3Server(Socket client)
+	public HolonomicEV3Server() throws IOException
 	{
-		this.client = client;
+		server = new ServerSocket(PORT);
 		Button.ESCAPE.addKeyListener(new EscapeListener());
-		pilot = new OmniPilot(16.0f, 5.0f, Motor.B, Motor.A, Motor.C, true, true, battery);
-		pilot.setLinearSpeed(80.0);
+
+		while (running)
+		{
+			pilot = new OmniPilot(16.0f, 5.0f, Motor.B, Motor.A, Motor.C, true, true, battery);
+			pilot.setLinearSpeed(80.0);
+			System.out.println("Awaiting client..");
+			this.client = server.accept();
+			this.run();
+		}
 	}
 	
 	public void run()
@@ -82,13 +82,10 @@ public class HolonomicEV3Server extends Thread
 				}
 				else if (myMessageArray[0] == 2)
 				{
-					// keyboard command
 					carAction(myMessageArray[1]);
-					// TODO: create absolute/relative switch
 				}
 				else if (myMessageArray[0] == 1)
 				{
-					// spaceNavigator
 					carAction(myMessageArray[1], myMessageArray[2], myMessageArray[3]);
 				}
 			}
@@ -114,16 +111,16 @@ public class HolonomicEV3Server extends Thread
 				pilot.travel(20, 180.0);
 				break;
 			case RIGHT:
-				pilot.travel(20, 270.0);
-				break;
-			case LEFT:
 				pilot.travel(20, 90.0);
 				break;
+			case LEFT:
+				pilot.travel(20, 270.0);
+				break;
 			case ROT_LEFT:
-				pilot.rotate(-45);
+				pilot.rotate(-30.0);
 				break;
 			case ROT_RIGHT:
-				pilot.rotate(45);
+				pilot.rotate(30.0);
 				break;
 		}
 	}
@@ -132,15 +129,16 @@ public class HolonomicEV3Server extends Thread
 	@SuppressWarnings("deprecation")
 	public void carAction(int linearSpeed, int angle, int angularSpeed)
 	{
-
-		//pilot.moveStraight(linearSpeed, (int) angle);
+		if(angularSpeed == 0)
+			pilot.moveStraight(linearSpeed, (int) angle);
+		else
+			pilot.spinningMove(linearSpeed, angularSpeed, angle);
+		
+//		pilot.spinningMove(0, angularSpeed, 0);
+//		pilot.moveStraight(linearSpeed, (int) angle);
 		
 		// The spinning move method is more sophisticated but difficult to control
-		pilot.spinningMove(linearSpeed, angularSpeed, (int) angle);
-			
-		// Uncomment for debugging data
-		// System.out.println("S: "+linearSpeed+" A: "+angle+" Com: "+ev3Sample[0]+" C:
-		// "+(int) (-ev3Sample[0]+angle)+" Sp: "+angularSpeed);
+		//pilot.spinningMove(linearSpeed, angularSpeed, angle);
 	}
 	
 	public class EscapeListener implements KeyListener

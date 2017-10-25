@@ -2,6 +2,7 @@ package holonomicEV3_client;
 
 import java.io.*;
 import java.net.Socket;
+import java.util.*;
 import java.util.ArrayList;
 
 import net.java.games.input.Component;
@@ -28,8 +29,9 @@ public class HolonomicEV3Client extends JFrame
 
 	public static final int PORT = 7360;
 
-	private final double MAX_VALUE = 0.6;
+	private final double MAX_VALUE = 1.0;
 	private final int MAX_SPEED = 32;
+	private final int MAX_SPIN = 64;
 	private final int SAMPLE_RATE = 200;
 
 	public static void main(String[] args)
@@ -54,6 +56,7 @@ public class HolonomicEV3Client extends JFrame
 
 	// Input handling
 	private ArrayList<Controller> foundControllers;
+	Map<String, Double> inputs = new HashMap<String, Double>();
 
 	public HolonomicEV3Client()
 	{
@@ -68,8 +71,19 @@ public class HolonomicEV3Client extends JFrame
 		foundControllers = new ArrayList<>();
 		searchForControllers();
 
+		initInputMap();
 		processInputs();
 
+	}
+	
+	private void initInputMap()
+	{
+		inputs.put("X Axis", 0.0);
+		inputs.put("Y Axis", 0.0);
+		inputs.put("Z Axis", 0.0);
+		inputs.put("X Rotation", 0.0);
+		inputs.put("Y Rotation", 0.0);
+		inputs.put("Z Rotation", 0.0);	
 	}
 
 	public void buildGUI(String ip)
@@ -141,7 +155,7 @@ public class HolonomicEV3Client extends JFrame
 				if (currentController != null)
 				{
 					updateFromController();
-				}
+				} // Else use key listener commands
 
 				try
 				{
@@ -164,14 +178,13 @@ public class HolonomicEV3Client extends JFrame
 			return;
 		}
 
-		double[] sn = { 0, 0, 0, 0, 0, 0, 0 };
-
 		Component[] components = currentController.getComponents();
 
 		for (Component component : components)
 		{
 			double temp = (double)component.getPollData();
 			
+			// Apply dead zone to noisy center of controller
 			if(temp > 0.0 && temp < 0.3)
 				temp = 0.0;
 				
@@ -181,62 +194,58 @@ public class HolonomicEV3Client extends JFrame
 			switch (component.getName())
 			{
 				case "X Axis":
-					sn[0] = temp;
+					inputs.put("X Axis", temp);
 					break;
 				case "Y Axis":
-					sn[1] = temp;
+					inputs.put("Y Axis", temp);
 					break;
 				case "Z Axis":
-					sn[2] = temp;
+					inputs.put("Z Axis", temp);
 					break;
 				case "X Rotation":
-					sn[3] = temp;
+					inputs.put("X Rotation", temp);
 					break;
 				case "Y Rotation":
-					sn[4] = temp;
+					inputs.put("Y Rotation", temp);
 					break;
 				case "Z Rotation":
-					sn[5] = temp;
+					inputs.put("Z Rotation", temp);
 					break;
 				default:
 					break;
 			}
 		}
 
-		double x = sn[0] * MAX_VALUE;
-		double y = sn[1] * MAX_VALUE;
-		double spinning = sn[2] * MAX_VALUE * MAX_SPEED;
+		//This needs to be configured per controller type...
+		double x = inputs.get("X Axis") * MAX_VALUE;
+		double y = inputs.get("Y Axis") * MAX_VALUE;
+		double spinning = (-inputs.get("X Rotation")) * MAX_VALUE * MAX_SPIN;
 		double speed = Math.sqrt(x * x + y * y) * MAX_SPEED;
+		
 		double theta = Math.atan2(y, x); // direction
 		double angle = Math.toDegrees(theta) + 90;
 
 		if (angle < 0.0d)
-		{
 			angle += 360.0;
-		}
+		
+		if(angle >= 360.0)
+			angle -= 360.0;
+		
 		if (speed > MAX_SPEED)
 		{
 			speed = MAX_SPEED;
 		}
-		;
-		if (speed == 0 && spinning == 0)
+		
+		if (spinning > MAX_SPIN)
 		{
-			angle = 0;
-		}
-		if (spinning > MAX_SPEED)
-		{
-			spinning = MAX_SPEED;
+			spinning = MAX_SPIN;
 		}
 		;
-		if (spinning < -MAX_SPEED)
+		if (spinning < -MAX_SPIN)
 		{
-			spinning = -MAX_SPEED;
+			spinning = -MAX_SPIN;
 		}
-
-		//System.out.println(Double.toString(sn[0]) + " " + Double.toString(sn[1]) + " " + Double.toString(sn[2]));
 		sendCommand(JOYSTICK, (int) speed, (int) angle, (int) spinning);
-		System.out.println(Double.toString(spinning));
-
 	}
 
 	private void sendCommand(int source, int angle, int r, int rotate)
@@ -266,9 +275,7 @@ public class HolonomicEV3Client extends JFrame
 		{
 			Controller controller = controllers[i];
 
-			if (controller.getType() == Controller.Type.STICK || controller.getType() == Controller.Type.GAMEPAD
-					|| controller.getType() == Controller.Type.WHEEL
-					|| controller.getType() == Controller.Type.FINGERSTICK)
+			if (controller.getType() == Controller.Type.GAMEPAD)
 			{
 				// Add new controller to the list of all controllers.
 				foundControllers.add(controller);
@@ -361,7 +368,7 @@ public class HolonomicEV3Client extends JFrame
 		@Override
 		public void keyPressed(KeyEvent e)
 		{
-			if (currentControllerIndex == 0)
+			if (currentController == null)
 			{
 				switch (e.getKeyCode())
 				{
